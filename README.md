@@ -17,7 +17,8 @@ go-parse-duration = "0.1"
 use go_parse_duration::{parse_duration, Error};
 
 fn parse() -> Result<i64, Error> {
-  parse_duration("300us")?
+  let d = parse_duration("300us")?;
+  Ok(d)
 }
 ```
 
@@ -26,11 +27,12 @@ fn parse() -> Result<i64, Error> {
 Converting to Chrono duration can be done easily:
 
 ```rust
-use chrono;
+use chrono::Duration;
 use go_parse_duration::{parse_duration, Error};
 
-fn parse() -> Result<chrono::Duration, Error> {
+fn parse() -> Result<Duration, Error> {
   let d = parse_duration("1m")?;
-  Duration::nanoseconds(d)
+  Ok(Duration::nanoseconds(d))
 }
 ```
+
