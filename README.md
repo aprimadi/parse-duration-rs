@@ -36,3 +36,7 @@ fn parse() -> Result<Duration, Error> {
 }
 ```
 
+## Author
+
+Armin Primadi https://github.com/aprimadi (@ [Sahamee](https://www.sahamee.com))
+
