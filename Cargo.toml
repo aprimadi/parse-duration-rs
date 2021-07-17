@@ -1,5 +1,11 @@
 [package]
-name = "parse_duration"
+name = "go-parse-duration"
 version = "0.1.0"
+authors = ["Armin Primadi <aprimadi@gmail.com>"]
+keywords = ["parse-duration", "time-handling", "time", "duration"]
+description = "Rust port to Golang parse duration."
+homepage = "https://github.com/aprimadi/parse-duration-rs"
+repository = "https://github.com/aprimadi/parse-duration-rs"
+license = "MIT"
 edition = "2018"
 
