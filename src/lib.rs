@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub enum Error {
     ParseError(String),
 }
@@ -14,102 +15,6 @@ enum InternalError {
 ///
 /// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 pub fn parse_duration(string: &str) -> Result<i64, Error> {
-    /*
-	orig := s
-	var d int64
-	neg := false
-
-	// Consume [-+]?
-	if s != "" {
-		c := s[0]
-		if c == '-' || c == '+' {
-			neg = c == '-'
-			s = s[1:]
-		}
-	}
-	// Special case: if all that is left is "0", this is zero.
-	if s == "0" {
-		return 0, nil
-	}
-	if s == "" {
-		return 0, errors.New("time: invalid duration " + quote(orig))
-	}
-	for s != "" {
-		var (
-			v, f  int64       // integers before, after decimal point
-			scale float64 = 1 // value = v + f/scale
-		)
-
-		var err error
-
-		// The next character must be [0-9.]
-		if !(s[0] == '.' || '0' <= s[0] && s[0] <= '9') {
-			return 0, errors.New("time: invalid duration " + quote(orig))
-		}
-		// Consume [0-9]*
-		pl := len(s)
-		v, s, err = leadingInt(s)
-		if err != nil {
-			return 0, errors.New("time: invalid duration " + quote(orig))
-		}
-		pre := pl != len(s) // whether we consumed anything before a period
-
-		// Consume (\.[0-9]*)?
-		post := false
-		if s != "" && s[0] == '.' {
-			s = s[1:]
-			pl := len(s)
-			f, scale, s = leadingFraction(s)
-			post = pl != len(s)
-		}
-		if !pre && !post {
-			// no digits (e.g. ".s" or "-.s")
-			return 0, errors.New("time: invalid duration " + quote(orig))
-		}
-
-		// Consume unit.
-		i := 0
-		for ; i < len(s); i++ {
-			c := s[i]
-			if c == '.' || '0' <= c && c <= '9' {
-				break
-			}
-		}
-		if i == 0 {
-			return 0, errors.New("time: missing unit in duration " + quote(orig))
-		}
-		u := s[:i]
-		s = s[i:]
-		unit, ok := unitMap[u]
-		if !ok {
-			return 0, errors.New("time: unknown unit " + quote(u) + " in duration " + quote(orig))
-		}
-		if v > (1<<63-1)/unit {
-			// overflow
-			return 0, errors.New("time: invalid duration " + quote(orig))
-		}
-		v *= unit
-		if f > 0 {
-			// float64 is needed to be nanosecond accurate for fractions of hours.
-			// v >= 0 && (f*unit/scale) <= 3.6e+12 (ns/h, h is the largest unit)
-			v += int64(float64(f) * (float64(unit) / scale))
-			if v < 0 {
-				// overflow
-				return 0, errors.New("time: invalid duration " + quote(orig))
-			}
-		}
-		d += v
-		if d < 0 {
-			// overflow
-			return 0, errors.New("time: invalid duration " + quote(orig))
-		}
-	}
-
-	if neg {
-		d = -d
-	}
-	return Duration(d), nil
-    */
     // [-+]?([0-9]*(\.[0-9]*)?[a-z]+)+
     let mut s = string;
     let mut d: i64 = 0; // duration to be returned
@@ -132,7 +37,7 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
     }
     while s != "" {
         // integers before, after decimal point
-        let mut v: i64 = 0;
+        let mut v: i64;
         let mut f: i64 = 0;
         // value = v + f / scale
         let mut scale: f64 = 1f64;
@@ -209,9 +114,17 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
         if f > 0 {
             // f64 is needed to be nanosecond accurate for fractions of hours.
             // v >= 0 && (f*unit/scale) <= 3.6e+12 (ns/h, h is the largest unit)
-            v += i64::from(f64::from(f) * (f64::from(unit) / scale));
+            v += (f as f64 * (unit as f64 / scale)) as i64;
+            if v < 0 {
+                // overflow
+                return Err(Error::ParseError(format!("invalid duration {}", string)));
+            }
         }
-        // TODO
+        d += v;
+        if d < 0 {
+            // overflow
+            return Err(Error::ParseError(format!("invalid duration {}", string)));
+        }
     }
     if neg {
         d = -d;
@@ -277,5 +190,24 @@ fn leading_fraction(s: &str) -> (i64, f64, &str) {
         i += 1;
     }
     (x, scale, &s[i..])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_duration() -> Result<(), Error> {
+        assert_eq!(parse_duration("50ns")?, 50);
+        assert_eq!(parse_duration("3ms")?, 3000000);
+        assert_eq!(parse_duration("2us")?, 2000);
+        assert_eq!(parse_duration("4s")?, 4000000000);
+        assert_eq!(parse_duration("1h45m")?, 6300000000000);
+        assert_eq!(
+            parse_duration("1").unwrap_err(), 
+            Error::ParseError(String::from("missing unit in duration: 1")),
+        );
+        Ok(())
+    }
 }
 
