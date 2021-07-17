@@ -1,6 +1,6 @@
 [package]
 name = "go-parse-duration"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Armin Primadi <aprimadi@gmail.com>"]
 keywords = ["parse-duration", "time-handling", "time", "duration"]
 description = "Rust port to Golang parse duration."
