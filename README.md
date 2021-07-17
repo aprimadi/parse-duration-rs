@@ -1,7 +1,7 @@
 # parse-duration-rs
 
 parse-duration-rs is a Rust port of Golang parse duration `time.ParseDuration`.
-It parses a duration string in a short from such as `100ms`, `1h45m`, and `3ns`
+It parses a duration string in a short form such as `100ms`, `1h45m`, and `3ns`
 and return duration in nanoseconds.
 
 The crate is called `go-parse-duration` and you can depend on it via cargo:
