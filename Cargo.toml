@@ -6,8 +6,10 @@ keywords = ["parse-duration", "time-handling", "time", "duration"]
 description = "Rust port to Golang parse duration."
 homepage = "https://github.com/aprimadi/parse-duration-rs"
 repository = "https://github.com/aprimadi/parse-duration-rs"
+documentation = "https://docs.rs/go-parse-duration"
 license = "MIT"
 edition = "2018"
 
 [dev-dependencies]
 chrono = "0.4"
+
