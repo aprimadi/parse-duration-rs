@@ -2,43 +2,51 @@
 //! parse-duration-rs is a Rust port of Golang parse duration `time.ParseDuration`.
 //! It parses a duration string in a short form such as `100ms`, `1h45m`, and `3ns`
 //! and return duration in nanoseconds.
-//! 
+//!
 //! The crate is called `go-parse-duration` and you can depend on it via cargo:
-//! 
+//!
 //! ```ini
 //! [dependencies]
 //! go-parse-duration = "0.1"
 //! ```
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```rust
 //! use go_parse_duration::{parse_duration, Error};
-//! 
+//!
 //! fn parse() -> Result<i64, Error> {
 //!   let d = parse_duration("300us")?;
 //!   Ok(d)
 //! }
 //! ```
-//! 
+//!
 //! **Usage with Chrono**
-//! 
+//!
 //! Converting to Chrono duration can be done easily:
-//! 
+//!
 //! ```rust
 //! use chrono::Duration;
 //! use go_parse_duration::{parse_duration, Error};
-//! 
+//!
 //! fn parse() -> Result<Duration, Error> {
 //!   let d = parse_duration("1m")?;
 //!   Ok(Duration::nanoseconds(d))
 //! }
 //! ```
 //!
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
     ParseError(String),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Error::ParseError(message) = self;
+        write!(formatter, "Parse error: {}", message)
+    }
 }
 
 enum InternalError {
@@ -48,7 +56,7 @@ enum InternalError {
 /// parse_duration parses a duration string and return duration in nanoseconds.
 ///
 /// A duration string is a possibly signed sequence of decimal numbers, each
-/// with optional fraction and a unit suffix, such as "300ms", "-1.5h", or 
+/// with optional fraction and a unit suffix, such as "300ms", "-1.5h", or
 /// "2h45m".
 ///
 /// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
@@ -98,7 +106,7 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
         }
         let pre = pl != s.len(); // whether we consume anything before a period
 
-		// Consume (\.[0-9]*)?
+        // Consume (\.[0-9]*)?
         let mut post = false;
         if s != "" && s.chars().nth(0).unwrap() == '.' {
             s = &s[1..];
@@ -127,7 +135,10 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
             i += 1;
         }
         if i == 0 {
-            return Err(Error::ParseError(format!("missing unit in duration: {}", string)));
+            return Err(Error::ParseError(format!(
+                "missing unit in duration: {}",
+                string
+            )));
         }
         let u = &s[..i];
         s = &s[i..];
@@ -137,11 +148,14 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
             "µs" => 1000i64, // U+00B5 = micro symbol
             "μs" => 1000i64, // U+03BC = Greek letter mu
             "ms" => 1000000i64,
-            "s" =>  1000000000i64,
-            "m" =>  60000000000i64,
-            "h" =>  3600000000000i64,
-            _ => { 
-                return Err(Error::ParseError(format!("unknown unit {} in duration {}", u, string)));
+            "s" => 1000000000i64,
+            "m" => 60000000000i64,
+            "h" => 3600000000000i64,
+            _ => {
+                return Err(Error::ParseError(format!(
+                    "unknown unit {} in duration {}",
+                    u, string
+                )));
             }
         };
         if v > (1 << 63 - 1) / unit {
@@ -177,9 +191,9 @@ fn leading_int(s: &str) -> Result<(i64, &str), InternalError> {
     while i < s.len() {
         let c = s.chars().nth(i).unwrap();
         if c < '0' || c > '9' {
-            break
+            break;
         }
-        if x > (1<<63-1)/10 {
+        if x > (1 << 63 - 1) / 10 {
             return Err(InternalError::Overflow);
         }
         let d = i64::from(c.to_digit(10).unwrap());
@@ -242,10 +256,9 @@ mod tests {
         assert_eq!(parse_duration("4s")?, 4000000000);
         assert_eq!(parse_duration("1h45m")?, 6300000000000);
         assert_eq!(
-            parse_duration("1").unwrap_err(), 
+            parse_duration("1").unwrap_err(),
             Error::ParseError(String::from("missing unit in duration: 1")),
         );
         Ok(())
     }
 }
-
