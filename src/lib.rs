@@ -35,10 +35,18 @@
 //! }
 //! ```
 //!
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
     ParseError(String),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Error::ParseError(message) = self;
+        write!(formatter, "Parse error: {}", message)
+    }
 }
 
 enum InternalError {
