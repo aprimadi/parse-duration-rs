@@ -51,6 +51,8 @@ impl fmt::Display for Error {
 
 enum InternalError {
     Overflow,
+    NaC,
+    NaN,
 }
 
 /// parse_duration parses a duration string and return duration in nanoseconds.
@@ -67,8 +69,12 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
     let mut neg = false;
 
     // Consume [-+]?
+
     if s != "" {
-        let c = s.chars().nth(0).unwrap();
+        let Some(c) = s.chars().nth(0) else {
+            // error message here
+            return Err(Error::ParseError(format!("invalid duration: {}", string)));
+        };
         if c == '-' || c == '+' {
             neg = c == '-';
             s = &s[1..];
@@ -89,10 +95,14 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
         let mut scale: f64 = 1f64;
 
         // The next character must be [0-9.]
-        let c = s.chars().nth(0).unwrap();
+        let Some(c) = s.chars().nth(0) else {
+            // error message here
+            return Err(Error::ParseError(format!("invalid duration: {}", string)));
+        };
         if !(c == '.' || '0' <= c && c <= '9') {
             return Err(Error::ParseError(format!("invalid duration: {}", string)));
         }
+
         // Consume [0-9]*
         let pl = s.len();
         match leading_int(s) {
@@ -101,21 +111,31 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
                 s = _s;
             }
             Err(_) => {
-                return Err(Error::ParseError(format!("invalid duration: {}", string)));
+                return Err(Error::ParseError(format!(
+                    "invalid character in: {}",
+                    string
+                )));
             }
         }
         let pre = pl != s.len(); // whether we consume anything before a period
 
         // Consume (\.[0-9]*)?
         let mut post = false;
-        if s != "" && s.chars().nth(0).unwrap() == '.' {
+
+        if s != "" && s.chars().nth(0) == Some('.') {
             s = &s[1..];
             let pl = s.len();
             match leading_fraction(s) {
-                (f_, scale_, s_) => {
+                Ok((f_, scale_, s_)) => {
                     f = f_;
                     scale = scale_;
                     s = s_;
+                }
+                Err(_) => {
+                    return Err(Error::ParseError(format!(
+                        "invalid character in: {}",
+                        string
+                    )));
                 }
             }
             post = pl != s.len();
@@ -128,7 +148,10 @@ pub fn parse_duration(string: &str) -> Result<i64, Error> {
         // Consume unit.
         let mut i = 0;
         while i < s.len() {
-            let c = s.chars().nth(i).unwrap();
+            let Some(c) = s.chars().nth(i) else {
+                // error message here
+                return Err(Error::ParseError(format!("invalid duration: {}", string)));
+            };
             if c == '.' || '0' <= c && c <= '9' {
                 break;
             }
@@ -189,14 +212,21 @@ fn leading_int(s: &str) -> Result<(i64, &str), InternalError> {
     let mut x = 0;
     let mut i = 0;
     while i < s.len() {
-        let c = s.chars().nth(i).unwrap();
+        let Some(c) = s.chars().nth(i) else {
+            return Err(InternalError::NaC);
+        };
         if c < '0' || c > '9' {
             break;
         }
         if x > (1 << 63 - 1) / 10 {
             return Err(InternalError::Overflow);
         }
-        let d = i64::from(c.to_digit(10).unwrap());
+
+        let Some(f) = c.to_digit(10) else {
+            return Err(InternalError::NaN)
+        };
+
+        let d = i64::from(f);
         x = x * 10 + d;
         if x < 0 {
             // overflow
@@ -213,13 +243,16 @@ fn leading_int(s: &str) -> Result<(i64, &str), InternalError> {
 // it just stops accumulating precision.
 //
 // It returns (value, scale, remainder) tuple.
-fn leading_fraction(s: &str) -> (i64, f64, &str) {
+fn leading_fraction(s: &str) -> Result<(i64, f64, &str), InternalError> {
     let mut i = 0;
     let mut x = 0i64;
     let mut scale = 1f64;
     let mut overflow = false;
     while i < s.len() {
-        let c = s.chars().nth(i).unwrap();
+        let Some(c) = s.chars().nth(i) else {
+            return Err(InternalError::NaC);
+        };
+
         if c < '0' || c > '9' {
             break;
         }
@@ -231,7 +264,13 @@ fn leading_fraction(s: &str) -> (i64, f64, &str) {
             overflow = true;
             continue;
         }
-        let d = i64::from(c.to_digit(10).unwrap());
+
+        let Some(f) = c.to_digit(10) else {
+            // error message here
+            break;
+        };
+
+        let d = i64::from(f);
         let y = x * 10 + d;
         if y < 0 {
             overflow = true;
@@ -241,7 +280,7 @@ fn leading_fraction(s: &str) -> (i64, f64, &str) {
         scale *= 10f64;
         i += 1;
     }
-    (x, scale, &s[i..])
+    Ok((x, scale, &s[i..]))
 }
 
 #[cfg(test)]
@@ -258,6 +297,20 @@ mod tests {
         assert_eq!(
             parse_duration("1").unwrap_err(),
             Error::ParseError(String::from("missing unit in duration: 1")),
+        );
+        assert_eq!(parse_duration("-1h45m")?, -6300000000000);
+        assert_eq!(parse_duration("+1h45m")?, 6300000000000);
+        assert_eq!(
+            parse_duration("a1ns").unwrap_err(),
+            Error::ParseError(String::from("invalid duration: a1ns"))
+        );
+        assert_eq!(
+            parse_duration("++50ns").unwrap_err(),
+            Error::ParseError(String::from("invalid duration: ++50ns"))
+        );
+        assert_eq!(
+            parse_duration("+").unwrap_err(),
+            Error::ParseError(String::from("invalid duration: +"))
         );
         Ok(())
     }
